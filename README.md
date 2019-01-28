@@ -1,2 +1,2 @@
 # CR-jobs
-harnessed jobs for Corner RAFT EO acquisitions and analyses
+Harnessed jobs and supporting python libs for Corner Raft activities at SLAC.
