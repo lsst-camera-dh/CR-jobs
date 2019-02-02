@@ -1,0 +1,2 @@
+git tag -a $1 -m '$1 tag of cr-jobs' 
+git push origin $1
