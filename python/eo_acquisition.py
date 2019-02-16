@@ -8,6 +8,8 @@ import glob
 import time
 from collections import namedtuple
 import logging
+from java.time import Duration
+from REBlib import acquireExposureMaster
 import re
 try:
     import java.lang
@@ -20,6 +22,7 @@ __all__ = ["hit_target_pressure", "EOAcquisition",
            "PhotodiodeReadout", "EOAcqConfig", "AcqMetadata", "logger"]
 
 CCS.setThrowExceptions(True)
+#CCS.setDefaultTimeout(3000.00)
 
 logging.basicConfig(format="%(message)s",
                     level=logging.INFO,
@@ -46,14 +49,14 @@ def hit_target_pressure(vac_sub, target, wait=5, tmax=7200, logger=logger):
         The logger object.
     """
     tstart = time.time()
-    pressure = vac_sub.synchCommand(20, "readPressure").getResult()
+    pressure = vac_sub.sendSynchCommand("readPressure")
     while pressure > target or pressure < 0:
         logger.info("time = %s, pressure = %f", time.time(), pressure)
         if (time.time() - tstart) > tmax:
             raise RuntimeError("Exceeded allowed pump-down time for "
                                + "target pressure %s" % target)
         time.sleep(wait)
-        pressure = vac_sub.synchCommand(20, "readPressure").getResult()
+        pressure = vac_sub.sendSynchCommand("readPressure")
 
 AcqMetadata = namedtuple('AcqMetadata', 'cwd raft_id run_number'.split())
 
@@ -122,13 +125,18 @@ class EOAcquisition(object):
         if subsystems is None:
             subsystems = dict(ts8='ts8', pd='ts8/Monitor',
                               mono='ts8/Monochromator')
+        print("subsystems = ",subsystems)
         self.sub = CcsSubsystems(subsystems=subsystems, logger=logger)
         self.sub.write_versions(os.path.join(metadata.cwd, 'ccs_versions.txt'))
         self._check_subsystems()
+
+        self.sub.ts8 = CCS.attachSubsystem('cr-raft')
+        self.sub.mono = CCS.attachSubsystem('ts8-bench/Monochromator')
+
         write_REB_info(self.sub.ts8,
                        outfile=os.path.join(metadata.cwd, 'reb_info.txt'))
         set_ccd_info(self.sub, ccd_names, logger)
-        self.sub.ts8.synchCommand(10, 'setDefaultImageDirectory %s/S${sensorLoc}'
+        self.sub.ts8.sendSynchCommand('setDefaultImageDirectory %s/S${sensorLoc}'
                                   % metadata.cwd)
         self.seqfile = seqfile
         self.eo_config = EOAcqConfig(acq_config_file)
@@ -144,15 +152,19 @@ class EOAcquisition(object):
             = int(self.eo_config.get('DEFAULT_SLITWIDTH', default=240))
         self.set_slitwidth(self.current_slitwidth, self.slit_id)
         self._read_instructions(acq_config_file)
-        self._fn_pattern = "${CCDSerialLSST}_${testType}_${imageType}_${SequenceInfo}_${RunNumber}_${timestamp}.fits"
-        self.sub.ts8.synchCommand(90, "loadSequencer", self.seqfile)
-        self.sub.mono.synchCommand(20, "openShutter")
+#        self._fn_pattern = "CR_${CCDSerialLSST}_${testType}_${imageType}_${SequenceInfo}_${RunNumber}_${timestamp}.fits"
+#        self._fn_pattern = "${CCDSerialLSST}_${testType}_${imageType}_${SequenceInfo}_${RunNumber}_${timestamp}.fits"
+#        self._fn_pattern = "${CCDSerialLSST}_${testType}_${imageType}_${SequenceInfo}_${RunNumber}_${timestamp}.fits"
+        self._fn_pattern = "${rebName}${sensorId}_${testType}_${imageType}_${RunNumber}_${timestamp}.fits"
+#        print("****** Would have loaded sequencer %s \nbut Homer told me not to until checking with Sven. !!!!!")
+        self.sub.ts8.sendSynchCommand("loadSequencer", self.seqfile)
+        self.sub.mono.sendSynchCommand("openShutter")
 
     def _check_subsystems(self):
         """
         Check that the required subsystems are present.
         """
-        required = 'ts8 pd mono ts8dac0 ts8dac1 ts8dac2'.split()
+        required = 'mono pd'.split()
         missing = []
         for subsystem in required:
             if not hasattr(self.sub, subsystem):
@@ -167,11 +179,11 @@ class EOAcquisition(object):
         number to the ts8 subsystem.
         """
         command = "setDefaultImageDirectory %s/S${sensorLoc}" % self.md.cwd
-        self.sub.ts8.synchCommand(10, command)
-        command = "setRaftName %s" % self.md.raft_id
-        self.sub.ts8.synchCommand(10, command)
-        command = "setRunNumber %s" % self.md.run_number
-        self.sub.ts8.synchCommand(10, command)
+        self.sub.ts8.sendSynchCommand(command)
+        command = "setPrimaryHeaderKeyword RaftName %s" % self.md.raft_id
+        self.sub.ts8.sendSynchCommand(command)
+        command = "setPrimaryHeaderKeyword RunNumber %s" % self.md.run_number
+        self.sub.ts8.sendSynchCommand(command)
 
     def _get_exptime_limits(self):
         """
@@ -214,7 +226,7 @@ class EOAcquisition(object):
 
     def set_slitwidth(self, width, slit_id):
         """Set the monochromator slit width."""
-        self.sub.mono.synchCommand(10, 'setSlitSize', slit_id, width)
+        self.sub.mono.sendSynchCommand('setSlitSize', slit_id, width)
 
     def set_wavelength(self, wl):
         """
@@ -225,9 +237,13 @@ class EOAcquisition(object):
         wl : float
             The desired wavelength in nm.
         """
+#        command = "setTimeout 5000"
+#        rwl = self.sub.mono.sendSynchCommand(command)
+
         command = "setWaveAndFilter %s" % wl
-        rwl = self.sub.mono.synchCommand(60, command).getResult()
-        self.sub.ts8.synchCommand(10, "setMonoWavelength", rwl)
+        rwl = self.sub.mono.sendSynchCommand(Duration.ofSeconds(7),command)
+
+        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword MonochromatorWavelength %s" % rwl)
         return rwl
 
     def _read_instructions(self, acq_config_file):
@@ -309,20 +325,24 @@ class EOAcquisition(object):
             file_template = self._fn_pattern
         self.logger.info("%s: taking image type %s %d", test_type, image_type,
                          seqno)
-        self.sub.ts8.synchCommand(10, "setTestType", test_type)
-        self.sub.ts8.synchCommand(10, "setImageType", image_type)
-        self.sub.ts8.synchCommand(10, "setSeqInfo", seqno)
+        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword TestType %s" % test_type)
+        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword ImageType %s" % image_type)
+        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword SeqInfo %s" % seqno)
 
-        self.verify_sequencer_params()
-        self.ccd_clear(1)
+#hn        self.verify_sequencer_params()
+#hn        self.ccd_clear(1)
 
-        command = 'acquireExposureMaster %d %s %s "%s"' \
-            % (1000*exptime, openShutter, actuateXed, file_template)
+#        command = 'acquireExposure %d %s %s \"%s\"' \
+#            % (1000*exptime, openShutter, actuateXed, file_template)
+#        command = 'acquireExposureMaster %d %s %s \"%s\"' \
+#            % (1000*exptime, openShutter, actuateXed, file_template)
         # ensure timeout exceeds exposure time by 20 seconds.
-        timeout = int(max(timeout, exptime + 20))
+        timeout = Duration.ofSeconds(int(max(timeout, exptime + 20)))
         for itry in range(max_tries):
             try:
-                result = self.sub.ts8.synchCommand(timeout, command).getResult()
+#                result = self.sub.ts8.sendSynchCommand(timeout,command)
+#                result = self.sub.ts8.synchCommand(timeout, command)
+                result = acquireExposureMaster(1000*exptime, openShutter, actuateXed, self.md.cwd, file_template)
                 return result
             except (StandardError, java.lang.Exception) as eobj:
                 self.logger.info("EOAcquisition.take_image: try %i failed",
@@ -408,7 +428,7 @@ class EOAcquisition(object):
             file_path = glob.glob(os.path.join(self.md.cwd, '*', fits_file))[0]
             command = "getFluxStats %s" % file_path
             flux_sum += \
-                float(self.sub.ts8.synchCommand(10, command).getResult())
+                float(self.sub.ts8.sendSynchCommand(command))
         return flux_sum/len(fits_files)
 
     def compute_exptime(self, target_counts, meas_flux):
@@ -438,7 +458,7 @@ class EOAcquisition(object):
         get phi0, phi1, phi2 existing values of pclkHighP
         """
         command = "printConfigurableParameters"
-        res = str(self.sub.ts8dac0.synchCommand(10, command).getResult())
+        res = str(self.sub.ts8dac0.sendSynchCommand(command))
         m = re.search(r"pclkHighP: ([-\d]+\.\d+),", res)
         if not m:
             self.logger.info("m is None, res=%s", res)
@@ -447,7 +467,7 @@ class EOAcquisition(object):
         if phi0 < 1.0:
             self.logger.info("ts8dac0.pclkHighP=%s < 1.0", phi0)
             return None
-        res = str(self.sub.ts8dac1.synchCommand(10, command).getResult())
+        res = str(self.sub.ts8dac1.sendSynchCommand(command))
         m = re.search(r"pclkHighP: ([-\d]+\.\d+),", res)
         if not m:
             self.logger.info("m is None, res=%s", res)
@@ -456,7 +476,7 @@ class EOAcquisition(object):
         if phi1 < 1.0:
             self.logger.info("ts8dac1.pclkHighP=%s < 1.0", phi1)
             return None
-        res = str(self.sub.ts8dac2.synchCommand(10, command).getResult())
+        res = str(self.sub.ts8dac2.sendSynchCommand(command))
         m = re.search(r"pclkHighP: ([-\d]+\.\d+),", res)
         if not m:
             self.logger.info("m is None, res=%s", res)
@@ -472,7 +492,7 @@ class EOAcquisition(object):
         get plo0, plo1, plo2 existing values of pclkLowP
         """
         command = "printConfigurableParameters"
-        res = str(self.sub.ts8dac0.synchCommand(10, command).getResult())
+        res = str(self.sub.ts8dac0.sendSynchCommand(command))
         m = re.search(r"pclkLowP: ([-\d]+\.\d+),", res)
         if not m:
             self.logger.info("m is None, res=%s", res)
@@ -481,7 +501,7 @@ class EOAcquisition(object):
         if plo0 > 0.5:
             self.logger.info("ts8dac0.pclkLowP: %s > 0.5", plo0)
             return None
-        res = str(self.sub.ts8dac1.synchCommand(10, command).getResult())
+        res = str(self.sub.ts8dac1.sendSynchCommand(command))
         m = re.search(r"pclkLowP: ([-\d]+\.\d+),", res)
         if not m:
             self.logger.info("m is None, res=%s", res)
@@ -490,7 +510,7 @@ class EOAcquisition(object):
         if plo1 > 0.5:
             self.logger.info("ts8dac1.pclkLowP: %s > 0.5", plo1)
             return None
-        res = str(self.sub.ts8dac2.synchCommand(10, command).getResult())
+        res = str(self.sub.ts8dac2.sendSynchCommand(command))
         m = re.search(r"pclkLowP: ([-\d]+\.\d+),", res)
         if not m:
             self.logger.info("m is None, res=%s", res)
@@ -503,7 +523,7 @@ class EOAcquisition(object):
 
     def get_ccdtype(self):
         """ return ccdtype as a string"""
-        res = str(self.sub.ts8.synchCommand(10, "getCcdType").getResult())
+        res = str(self.sub.ts8.sendSynchCommand("getCcdType"))
         if re.match(r"^e2v$", res):
             return "e2v"
         elif re.match(r"^itl$", res):
@@ -517,14 +537,14 @@ class EOAcquisition(object):
         Otherwise the wrong sequencer is loaded
         """
         #- CleaningNummber = [0, 0, 0]
-        res = str(self.sub.ts8.synchCommand(10,
-                         "getSequencerParameter", "CleaningNumber").getResult())
+        res = str(self.sub.ts8.sendSynchCommand(
+                         "getSequencerParameter", "CleaningNumber"))
         if not re.match(r"\[0, 0, 0\]", res):
             self.logger.info("SeqParam CleaningNumber:%s invalid", res)
             raise java.lang.Exception("Bad Sequencer: CleaningNumber=0 required")
         #- ClearCount = [1, 1, 1]
-        res = str(self.sub.ts8.synchCommand(10,
-                             "getSequencerParameter", "ClearCount").getResult())
+        res = str(self.sub.ts8.sendSynchCommand(
+                             "getSequencerParameter", "ClearCount"))
         if not re.match(r"\[1, 1, 1\]", res):
             self.logger.info("SeqParam ClearCount:%s invalid", res)
             raise java.lang.Exception("Bad Sequencer: ClearCount=1 required")
@@ -540,78 +560,78 @@ class EOAcquisition(object):
         if nclears < 1:
             return
         ccdtype = self.get_ccdtype()
-        if ccdtype == 'e2v':
-            phi_shifted = 5.5  #- hard coded value for now
-            #- verify input value makes sense
-            #
-            if phi_shifted < 5.0 or phi_shifted > 7.0:
-                self.logger.info("P-HI:%s not in range 5.0..7.0", phi_shifted)
-                raise java.lang.Exception("Bad phi_shifted value {}".format(phi_shifted))
-            #
-            #- get original values for Parallel high and low rails
-            #
-            phi = self.getParallelHighConfig()
-            if phi is None:
-                self.logger.info("getParallelHighConfig() = None")
-                #- throw an exception here or something
-                raise java.lang.Exception("failed getting PHi config")
-            #
-            plo = self.getParallelLowConfig()
-            if plo is None:
-                self.logger.info("getParallelLowConfig() = None")
-                #- throw an exception here or something
-                raise java.lang.Exception("failed getting PLow config")
-            #
-            #- determine operating mode (unipolar (3) or bipolar (0))
-            #
-            self.logger.info("phi[]= %s", phi)
-            self.logger.info("plo[]= %s", plo)
-            cnt = 0
-            for i in range(len(phi)):
-                if phi[i] > 7.5 and plo[i] >= 0.0  and plo[i] < 2.0:
-                    cnt += 1
-                if phi[i] > 2.0 and phi[i] < 7.0  and plo[i] < -3.0:
-                    cnt -= 1
-            if cnt == 3:
-                unipolar = True
-                self.logger.info("Parallel Voltages are unipolar => Shifted Clearing")
-            elif cnt == -3:
-                unipolar = False
-                self.logger.info("Parallel Voltages are bipolar => Regular Clearing")
-            else:
-                raise java.lang.Exception(
-                    "invalid mode: must be bipolar (+/-) or unipolar (>0)")
-            if unipolar:
-                #
-                #- change to the new value
-                #
-                self.logger.info("changing dac %s to %s...",
-                                 "pclkHighP", phi_shifted)
-                self.sub.ts8dac0.synchCommand(10, "change", "pclkHighP", phi_shifted)
-                self.sub.ts8dac1.synchCommand(10, "change", "pclkHighP", phi_shifted)
-                self.sub.ts8dac2.synchCommand(10, "change", "pclkHighP", phi_shifted)
-                self.sub.ts8.synchCommand(10, "loadDacs true")
-                #
-        #- Perform the Clear main
-        #
+#        if ccdtype == 'e2v':
+#            phi_shifted = 5.5  #- hard coded value for now
+#            #- verify input value makes sense
+#            #
+#            if phi_shifted < 5.0 or phi_shifted > 7.0:
+#                self.logger.info("P-HI:%s not in range 5.0..7.0", phi_shifted)
+#                raise java.lang.Exception("Bad phi_shifted value {}".format(phi_shifted))
+#            #
+#            #- get original values for Parallel high and low rails
+#            #
+#            phi = self.getParallelHighConfig()
+#            if phi is None:
+#                self.logger.info("getParallelHighConfig() = None")
+#                #- throw an exception here or something
+#                raise java.lang.Exception("failed getting PHi config")
+#            #
+#            plo = self.getParallelLowConfig()
+#            if plo is None:
+#                self.logger.info("getParallelLowConfig() = None")
+#                #- throw an exception here or something
+#                raise java.lang.Exception("failed getting PLow config")
+#            #
+#            #- determine operating mode (unipolar (3) or bipolar (0))
+#            #
+#            self.logger.info("phi[]= %s", phi)
+#            self.logger.info("plo[]= %s", plo)
+#            cnt = 0
+#            for i in range(len(phi)):
+#                if phi[i] > 7.5 and plo[i] >= 0.0  and plo[i] < 2.0:
+#                    cnt += 1
+#                if phi[i] > 2.0 and phi[i] < 7.0  and plo[i] < -3.0:
+#                    cnt -= 1
+#            if cnt == 3:
+#                unipolar = True
+#                self.logger.info("Parallel Voltages are unipolar => Shifted Clearing")
+#            elif cnt == -3:
+#                unipolar = False
+#                self.logger.info("Parallel Voltages are bipolar => Regular Clearing")
+#            else:
+#                raise java.lang.Exception(
+#                    "invalid mode: must be bipolar (+/-) or unipolar (>0)")
+#            if unipolar:
+#                #
+#                #- change to the new value
+#                #
+#                self.logger.info("changing dac %s to %s...",
+#                                 "pclkHighP", phi_shifted)
+#                self.sub.ts8dac0.sendSynchCommand("change", "pclkHighP", phi_shifted)
+#                self.sub.ts8dac1.sendSynchCommand("change", "pclkHighP", phi_shifted)
+#                self.sub.ts8dac2.sendSynchCommand("change", "pclkHighP", phi_shifted)
+#                self.sub.ts8.sendSynchCommand("loadDacs true")
+#                #
+#        #- Perform the Clear main
+#        #
         self.logger.info("Clearing CCD %s times...", nclears)
         for _ in range(nclears):
-            self.sub.ts8.synchCommand(10, "setSequencerStart", "Clear")
-            self.sub.ts8.synchCommand(10, "startSequencer")
-            self.sub.ts8.synchCommand(10, "waitSequencerDone", 1000).getResult()
-            self.sub.ts8.synchCommand(10, "setSequencerStart", "Bias")
-        if ccdtype == 'e2v':
-            if unipolar:
-                #
-                #- change back to original value
-                #
-                self.logger.info("changing dac %s to %s...",
-                                 "pclkHighP", phi)
-                self.sub.ts8dac0.synchCommand(10, "change", "pclkHighP", phi[0])
-                self.sub.ts8dac1.synchCommand(10, "change", "pclkHighP", phi[1])
-                self.sub.ts8dac2.synchCommand(10, "change", "pclkHighP", phi[2])
-                self.sub.ts8.synchCommand(10, "loadDacs true")
-                #
+            self.sub.ts8.sendSynchCommand("setSequencerStart", "Clear")
+            self.sub.ts8.sendSynchCommand("startSequencer")
+            self.sub.ts8.sendSynchCommand("waitSequencerDone", 1000)
+            self.sub.ts8.sendSynchCommand("setSequencerStart", "Bias")
+#        if ccdtype == 'e2v':
+#            if unipolar:
+#                #
+#                #- change back to original value
+#                #
+#                self.logger.info("changing dac %s to %s...",
+#                                 "pclkHighP", phi)
+#                self.sub.ts8dac0.sendSynchCommand("change", "pclkHighP", phi[0])
+#                self.sub.ts8dac1.sendSynchCommand("change", "pclkHighP", phi[1])
+#                self.sub.ts8dac2.sendSynchCommand("change", "pclkHighP", phi[2])
+#                self.sub.ts8.sendSynchCommand("loadDacs true")
+#                #
 
 class PhotodiodeReadout(object):
     """
@@ -670,7 +690,7 @@ class PhotodiodeReadout(object):
         running = False
         while not running:
             try:
-                running = self.sub.pd.synchCommand(20, "isAccumInProgress").getResult()
+                running = self.sub.pd.sendSynchCommand("isAccumInProgress")
             except StandardError as eobj:
                 self.logger.info("PhotodiodeReadout.start_accumulation:")
                 self.logger.info(str(eobj))
@@ -689,9 +709,10 @@ class PhotodiodeReadout(object):
         self.logger.info("Photodiode about to be readout at %f",
                          time.time() - self._start_time)
 
-        result = self.sub.pd.synchCommand(1000, "readBuffer", pd_filename)
+        result = self.sub.pd.sendSynchCommand("readBuffer %s" % pd_filename)
+#        result = self.sub.pd.sendSynchCommand(1000, "readBuffer", pd_filename)
         self.logger.info("Photodiode readout accumulation finished at %f, %s",
-                         time.time() - self._start_time, result.getResult())
+                         time.time() - self._start_time, result)
 
         return pd_filename
 
