@@ -6,6 +6,8 @@ import os
 import sys
 import glob
 import time
+#import pyfits as pf
+#import lsst.eotest.image_utils as imutils
 from collections import namedtuple
 import logging
 from java.time import Duration
@@ -123,14 +125,16 @@ class EOAcquisition(object):
             ID of the monochormator slit to set via ._set_slitwidth(...)
         """
         if subsystems is None:
-            subsystems = dict(ts8='ts8', pd='ts8/Monitor',
-                              mono='ts8/Monochromator')
+            subsystems = dict(ts8='cr-raft', pd='ts8-bench/Monitor',
+                              mono='ts8-bench/Monochromator')
         print("subsystems = ",subsystems)
         self.sub = CcsSubsystems(subsystems=subsystems, logger=logger)
         self.sub.write_versions(os.path.join(metadata.cwd, 'ccs_versions.txt'))
         self._check_subsystems()
 
+# The following shouldn't be needed ... still investigating why
         self.sub.ts8 = CCS.attachSubsystem('cr-raft')
+        self.sub.pd = CCS.attachSubsystem('ts8-bench/Monitor')
         self.sub.mono = CCS.attachSubsystem('ts8-bench/Monochromator')
 
         write_REB_info(self.sub.ts8,
@@ -342,7 +346,7 @@ class EOAcquisition(object):
             try:
 #                result = self.sub.ts8.sendSynchCommand(timeout,command)
 #                result = self.sub.ts8.synchCommand(timeout, command)
-                result = acquireExposureMaster(1000*exptime, openShutter, actuateXed, self.md.cwd, file_template)
+                result = acquireExposureMaster(1000*exptime, openShutter, actuateXed, "%s/S${sensorLoc}" % self.md.cwd, file_template)
                 return result
             except (StandardError, java.lang.Exception) as eobj:
                 self.logger.info("EOAcquisition.take_image: try %i failed",
@@ -425,10 +429,28 @@ class EOAcquisition(object):
             # case.
             return 1
         for fits_file in fits_files:
+            print("fits_file = ",fits_file)
+            print("self.md.cwd = ",self.md.cwd)
             file_path = glob.glob(os.path.join(self.md.cwd, '*', fits_file))[0]
-            command = "getFluxStats %s" % file_path
-            flux_sum += \
-                float(self.sub.ts8.sendSynchCommand(command))
+
+#pf            hdulist = pf.open(file_path, mode='readonly')
+            avg = 0.0
+            segcount = 0
+            for i in range(16):
+#imtuils                md = imutils.Metadata(file_path, i+1)
+#imutils                avg = avg + md.get('AVERAGE') - md.get('AVGBIAS')
+                segcount = segcount+1
+            avg = avg / segcount
+#pf            hdulist.close()
+
+            avg = 100.
+            print("SIGNAL FORCED TO 100 UNTIL A FITS UTILITY FOR JYTHON CAN BE FOUND!!!!!")
+            print("average signal = ",avg)
+
+#ts8            command = "getFluxStats %s" % file_path
+#ts8            flux_sum += \
+#ts8                float(self.sub.ts8.sendSynchCommand(command))
+            flux_sum += avg
         return flux_sum/len(fits_files)
 
     def compute_exptime(self, target_counts, meas_flux):
@@ -677,11 +699,11 @@ class PhotodiodeReadout(object):
         """
 
         # get Keithley picoAmmeters ready by resetting and clearing buffer
-        self.sub.pd.synchCommand(60, "reset")
-        self.sub.pd.synchCommand(60, "clrbuff")
+        self.sub.pd.sendSynchCommand("reset")
+        self.sub.pd.sendSynchCommand("clrbuff")
 
         # start accummulating current readings
-        self._pd_result = self.sub.pd.asynchCommand("accumBuffer", self.nreads,
+        self._pd_result = self.sub.pd.sendAsynchCommand("accumBuffer", self.nreads,
                                                     self.nplc, True)
         self._start_time = time.time()
         self.logger.info("Photodiode readout accumulation started at %f",
@@ -709,7 +731,7 @@ class PhotodiodeReadout(object):
         self.logger.info("Photodiode about to be readout at %f",
                          time.time() - self._start_time)
 
-        result = self.sub.pd.sendSynchCommand("readBuffer %s" % pd_filename)
+        result = self.sub.pd.sendSynchCommand(Duration.ofSeconds(1000),"readBuffer %s" % pd_filename)
 #        result = self.sub.pd.sendSynchCommand(1000, "readBuffer", pd_filename)
         self.logger.info("Photodiode readout accumulation finished at %f, %s",
                          time.time() - self._start_time, result)
@@ -721,7 +743,7 @@ class PhotodiodeReadout(object):
         for fits_file in fits_files:
             full_path = glob.glob('%s/*/%s' % (self.md.cwd, fits_file))[0]
             command = "addBinaryTable %s %s AMP0.MEAS_TIMES AMP0_MEAS_TIMES AMP0_A_CURRENT %d" % (pd_filename, full_path, self._start_time)
-            self.sub.ts8.synchCommand(200, command)
+            self.sub.ts8.sendSynchCommand(command)
             self.logger.info("Photodiode readout added to fits file %s",
                              fits_file)
 

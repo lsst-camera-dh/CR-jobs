@@ -477,7 +477,7 @@ def ccdPowerUp(reb, ccd):
         vrampOG(reb,0,-2.0, 1.0)
         vrampGD(reb,0,20.0, 4.0)
         vrampRD(reb,0,13.0, 3.0)
-        vrampOD(reb,0,26.0, 4.0)
+        vrampOD(reb,0,25.0, 4.0)
     elif ccd.upper() in ['ITLB','ITL_B']:
         vsetSerLo(reb,-8.0)
         vsetSerHi(reb,+4.0)
@@ -488,7 +488,7 @@ def ccdPowerUp(reb, ccd):
         vsetOG(reb,+3.0)
         vsetGD(reb,20.0)
         vsetRD(reb,13.0)
-        vsetOD(reb,26.0)
+        vsetOD(reb,25.0)
         vsetDphi(reb,+10.0)
         dphiOn(reb)
     else:
@@ -529,7 +529,7 @@ def ccdPowerDown(reb, ccd):
 
 
 def ITLdefaults(reb):
-    if verbose: print "Seting default ITL voltages"
+    if verbose: print "Setting default ITL voltages"
     vsetParLo(reb,-8.0)
     vsetParHi(reb,+3.0)
     vsetSerLo(reb,-5.0)
@@ -538,7 +538,7 @@ def ITLdefaults(reb):
     vsetRGHi(reb,+8.0)
     vsetRD(reb,13.0)
     vsetOG(reb,-2.0)
-    vsetOD(reb,26.0)
+    vsetOD(reb,25.0)
     vsetGD(reb,20.0)
 
 def setSeqStart(reb,main):
@@ -627,7 +627,10 @@ def acquireBias(filebase):
 def acquireDark(exptime, filebase):
     if verbose: print "Acquire Dark:  Time = ", exptime, "   Filebase = ",filebase
     raftsub = CCS.attachSubsystem(subsystem)
-#    result = raftsub.sendSynchCommand("setSequencerStart Dark")
+    try:
+        result = raftsub.sendSynchCommand("setSequencerStart Dark")
+    except:
+        print("Failed to set sequencer start to Exposure!!! Proceeding during development period")
     #if verbose: print result
     raftsub.sendSynchCommand("setExposureTime %i" % long(exptime))
     raftsub.sendSynchCommand("setSequencerParameter ExposureTime %i" % long(exptime * 1000.0 / 25))
@@ -646,14 +649,19 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
         files = null
         print("XED functionality not implimented for Corner Raft")
     else :
-        files = acquireExposure(exptime, filebase)
+        files = acquireExposure(exptime/1000., filebase)
+        print("list of files produced = ",files)
     return files
 
 
 def acquireExposure(exptime, filebase):
     if verbose: print "Acquire Exposure:  Time = ", exptime, "   Filebase = ",filebase
     raftsub = CCS.attachSubsystem(subsystem)
-    result = raftsub.sendSynchCommand("setSequencerStart Exposure")
+    try:
+        result = raftsub.sendSynchCommand("setSequencerStart Exposure")
+    except:
+        print("Failed to set sequencer start to Exposure!!! Proceeding during development period")
+
     #if verbose: print result
     raftsub.sendSynchCommand("setExposureTime %i" % long(exptime))
     raftsub.sendSynchCommand("setSequencerParameter ExposureTime %i" % long(exptime * 1000 / 25))
