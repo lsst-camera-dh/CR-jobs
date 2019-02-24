@@ -599,17 +599,33 @@ def acquire(exptime):
     raftsub = CCS.attachSubsystem(subsystem)
 #    raftsub.sendSynchCommand("monitor-update change taskPeriodMillis -1")  # stop monitoring REBs (noisy)
 
-    timeout = int((exptime + 10) * 1000) 
+    timeout = int((exptime + 120.0) * 1000.0)
 
-    raftsub.sendSynchCommand(Duration.ofSeconds(timeout/1000),"acquireImage")
-#   raftsub.sendSynchCommand("startSequencer")   # not needed with new firmware
 
-    if verbose: print 'acquire: timeout =', timeout 
-    raftsub.sendSynchCommand(Duration.ofSeconds(timeout/1000),"waitForImage %i" % int(timeout))
+    if verbose: print 'acquire: doing acquireImage' 
+    result = raftsub.sendSynchCommand(Duration.ofMillis(timeout),"acquireImage")
+
+    time.sleep(exptime)
+
+    if exptime==0 :
+        if verbose: print 'acquire: doing Bias (ReadFrame)' 
+        result = raftsub.sendSynchCommand("setSequencerStart Bias")
+    else :
+        if verbose: print 'acquire: doing Acquire (ReadFrame)' 
+        result = raftsub.sendSynchCommand("setSequencerStart Acquire")
+    result = raftsub.sendSynchCommand("startSequencer") 
+
+
+    if verbose: print 'acquire: Waiting for Image ... timeout =', timeout 
+    result = raftsub.sendSynchCommand(Duration.ofMillis(timeout),"waitForImage 30000")
+
+    if result == 0 :
+        raise Exception,"Timeout waiting for image"
+
 #    raftsub.sendSynchCommand("monitor-update change taskPeriodMillis 1000")  # restart monitorinng REBs
+
     dataDir_ = getDataDir()
     if verbose: print "Saving FITS image to ", dataDir_
-#    raftsub.sendSynchCommand("setFitsFileNamePattern blah.fits")
     result = raftsub.sendSynchCommand(Duration.ofSeconds(120),"saveFitsImage",dataDir_)
     if verbose: print result
     return result
@@ -646,7 +662,7 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
     elif not dolight and not doXED :
         files = acquireDark(exptime/1000., filebase)
     elif not dolight and doXED :
-        files = null
+        files = acquireDark(exptime/1000., filebase)
         print("XED functionality not implimented for Corner Raft")
     else :
         files = acquireExposure(exptime/1000., filebase)
@@ -657,15 +673,20 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
 def acquireExposure(exptime, filebase):
     if verbose: print "Acquire Exposure:  Time = ", exptime, "   Filebase = ",filebase
     raftsub = CCS.attachSubsystem(subsystem)
+
+    raftsub.sendSynchCommand("setExposureTime %i" % long(exptime))
+    print("setSequencerParameter ExposureTime %i" % long(exptime * 1000 / 25))
+    raftsub.sendSynchCommand("setSequencerParameter ExposureTime %i" % long(exptime * 1000 / 25))
+#    setFilename(filebase)
+
     try:
-        result = raftsub.sendSynchCommand("setSequencerStart Exposure")
+#        result = raftsub.sendSynchCommand("setSequencerStart Exposure")
+        print("set sequencer start to Expose")
+        result = raftsub.sendSynchCommand("setSequencerStart Expose")
     except:
         print("Failed to set sequencer start to Exposure!!! Proceeding during development period")
 
     #if verbose: print result
-    raftsub.sendSynchCommand("setExposureTime %i" % long(exptime))
-    raftsub.sendSynchCommand("setSequencerParameter ExposureTime %i" % long(exptime * 1000 / 25))
-#    setFilename(filebase)
     return acquire(exptime)
 
 def acquirePumped(exptime, filebase):

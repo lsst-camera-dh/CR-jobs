@@ -5,7 +5,9 @@ from __future__ import print_function
 import os
 import sys
 import glob
+import subprocess
 import time
+
 #import pyfits as pf
 #import lsst.eotest.image_utils as imutils
 from collections import namedtuple
@@ -245,7 +247,7 @@ class EOAcquisition(object):
 #        rwl = self.sub.mono.sendSynchCommand(command)
 
         command = "setWaveAndFilter %s" % wl
-        rwl = self.sub.mono.sendSynchCommand(Duration.ofSeconds(7),command)
+        rwl = self.sub.mono.sendSynchCommand(Duration.ofSeconds(10),command)
 
         self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword MonochromatorWavelength %s" % rwl)
         return rwl
@@ -432,19 +434,30 @@ class EOAcquisition(object):
             print("fits_file = ",fits_file)
             print("self.md.cwd = ",self.md.cwd)
             file_path = glob.glob(os.path.join(self.md.cwd, '*', fits_file))[0]
+            print('file_path = %s' % file_path)
+#            print('export = ',os.popen('printenv').readline())
+#            print('CRJOBSDIR = ',os.getenv('CRJOBSDIR'))
+            crjd = '/home/homer/cr/jh_inst/1.0.1/CR-jobs-1.0.1/python'
+            pydir = '/gpfs/slac/lsst/fs2/u1/dh/software/centos7-gcc48/stack/v16_py3/python/miniconda3-4.3.21/bin/'
+#            cmndstr = '%s/python %s/get_signal_level.py %s 2>&1' % (pydir,crjd,file_path)
+            cmndstr = 'bash -c "source /home/homer/cr/setup.sh 2>&1 ; %s/get_signal_level.py %s 2>&1"' % (crjd,file_path)
+#            cmndstr = 'which python'
+            print("cmndstr = ",cmndstr)
+#            os.system(cmndstr)
+            print("============================")
+#            sigstr = os.popen(cmndstr, shell=True).readline()
+            my_env = os.environ.copy()
+#my_env["PATH"] = "/usr/sbin:/sbin:" + my_env["PATH"]
+#      subprocess.Popen(my_command, env=my_env)
+            p = subprocess.Popen(cmndstr, shell=True, bufsize=0, stdout=subprocess.PIPE, universal_newlines=True, env=my_env)
+            p.wait()
+            sigstr = p.stdout.read()
+            p.stdout.close()
+#            sigstr = subprocess.check_output('%s/get_signal_level.py' % (crjd),'%s' % (file_path))
+            print('sigstr = ',sigstr)
+            avg = float(sigstr)
 
-#pf            hdulist = pf.open(file_path, mode='readonly')
-            avg = 0.0
-            segcount = 0
-            for i in range(16):
-#imtuils                md = imutils.Metadata(file_path, i+1)
-#imutils                avg = avg + md.get('AVERAGE') - md.get('AVGBIAS')
-                segcount = segcount+1
-            avg = avg / segcount
-#pf            hdulist.close()
-
-            avg = 100.
-            print("SIGNAL FORCED TO 100 UNTIL A FITS UTILITY FOR JYTHON CAN BE FOUND!!!!!")
+            avg = max(avg,999.)
             print("average signal = ",avg)
 
 #ts8            command = "getFluxStats %s" % file_path
@@ -701,6 +714,7 @@ class PhotodiodeReadout(object):
         # get Keithley picoAmmeters ready by resetting and clearing buffer
         self.sub.pd.sendSynchCommand("reset")
         self.sub.pd.sendSynchCommand("clrbuff")
+        self.sub.pd.sendSynchCommand("setCurrentRange 0.0000002")
 
         # start accummulating current readings
         self._pd_result = self.sub.pd.sendAsynchCommand("accumBuffer", self.nreads,
@@ -731,8 +745,9 @@ class PhotodiodeReadout(object):
         self.logger.info("Photodiode about to be readout at %f",
                          time.time() - self._start_time)
 
+        result = self.sub.pd.sendSynchCommand("setTimeout 1000")
         result = self.sub.pd.sendSynchCommand(Duration.ofSeconds(1000),"readBuffer %s" % pd_filename)
-#        result = self.sub.pd.sendSynchCommand(1000, "readBuffer", pd_filename)
+        print("pd_filename = ",pd_filename)
         self.logger.info("Photodiode readout accumulation finished at %f, %s",
                          time.time() - self._start_time, result)
 
@@ -754,10 +769,10 @@ class PhotodiodeReadout(object):
         extension.
         """
         pd_filename = self.write_readings(seqno, icount)
-        try:
-            self.add_pd_time_history(fits_files, pd_filename)
-        except TypeError:
-            # We must be using a subsystem-proxy for the ts8
-            # subsystem.  TODO: Find a better way to handle the
-            # subsystem-proxy case.
-            pass
+#        try:
+#            self.add_pd_time_history(fits_files, pd_filename)
+#        except TypeError:
+#            # We must be using a subsystem-proxy for the ts8
+#            # subsystem.  TODO: Find a better way to handle the
+#            # subsystem-proxy case.
+#            pass
