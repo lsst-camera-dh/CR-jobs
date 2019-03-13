@@ -21,6 +21,9 @@ class Fe55Acquisition(EOAcquisition):
         actuateXed = True
         image_type = "FE55"
 
+        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
+        pdusub.sendSynchCommand("PDU20 forceOutletOn XED-CONTROL")
+
         seqno = 0
         for tokens in self.instructions:
             exptime = float(tokens[1])
@@ -31,6 +34,9 @@ class Fe55Acquisition(EOAcquisition):
                 self.take_image(seqno, exptime, openShutter, actuateXed,
                                 image_type)
                 seqno += 1
+
+        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
+        pdusub.sendSynchCommand("PDU20 forceOutletOff XED-CONTROL")
 
 if __name__ == '__main__':
     metadata = AcqMetadata(cwd=tsCWD, raft_id=UNITID, run_number=RUNNUM)

@@ -657,16 +657,59 @@ def acquireDark(exptime, filebase):
 def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
     setDataDir(cwd)
     print("dataDir_ = ",dataDir_)
+
+    raftsub = CCS.attachSubsystem(subsystem)
+
+# ------- pointer adjustment for choosing dark/flat exposure type
+    subs = raftsub.sendSynchCommand("getSequencerSubroutineMap")[0]
+
+#    submap = {}
+#    for sub in subs.entrySet():
+#        print "%s=%d" % (sub.getKey(),sub.getValue())
+#        submap[sub.getKey()] = sub.getValue()
+
+#        if "ExposureFlush" in sub.getKey() :
+#            ExpFlush = sub.getValue()
+#            print "ExpFlush value = ",ExpFlush
+#        if "SerialFlush" in sub.getKey() :
+#            SerFlush = sub.getValue()
+#            print "Serial value = ",SerFlush
+#    print "submap=\n",submap
+
+#    pntrs = raftsub.sendSynchCommand("getSequencerPointers")[0]
+#    for pntr in pntrs.entrySet():
+#        print "%s=%d" % (pntr.getKey(),pntr.getValue().value)
+
+    flushpntr = None
+    if dolight :
+        flushpntr = int(subs["ExposureFlush"])
+        print "setting exposure to ExposureFlush with index ",flushpntr
+    else :
+        flushpntr = int(subs["SerialFlush"])
+        print "setting exposure to SerialFlush with index ",flushpntr
+    pntrs = raftsub.sendSynchCommand("setSequencerParameter %s %s" % ("Exposure",str(flushpntr)))
+# -------
+
     if exptime == 0.0 :
         files = acquireBias(filebase)
-    elif not dolight and not doXED :
-        files = acquireDark(exptime/1000., filebase)
-    elif not dolight and doXED :
-        files = acquireDark(exptime/1000., filebase)
-        print("XED functionality not implimented for Corner Raft")
     else :
         files = acquireExposure(exptime/1000., filebase)
-        print("list of files produced = ",files)
+#    elif not dolight and not doXED :
+#        files = acquireDark(exptime/1000., filebase)
+#    elif not dolight and doXED :
+#        files = acquireDark(exptime/1000., filebase)
+#        print("XED functionality not implimented for Corner Raft")
+#    else :
+#        files = acquireExposure(exptime/1000., filebase)
+
+
+# move to top harnessed job level
+#    if doXED :
+#        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
+#        pdusub.sendSynchCommand("PDU20 forceOutletOn XED-CONTROL")
+
+
+    print("list of files produced = ",files)
     return files
 
 
