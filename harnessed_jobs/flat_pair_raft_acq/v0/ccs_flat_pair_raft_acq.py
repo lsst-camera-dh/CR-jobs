@@ -1,6 +1,7 @@
 """
 Jython script to run flat pair acquisitions at TS8.
 """
+import time
 from eo_acquisition import EOAcquisition, PhotodiodeReadout, AcqMetadata, logger
 
 class FlatAcquisition(EOAcquisition):
@@ -26,17 +27,22 @@ class FlatAcquisition(EOAcquisition):
         # Get measured flux at current wavelength for exposure time
         # calculation.
         meas_flux = self.measured_flux(self.wl)    # e-/pixel/second
-        self.logger.info("flat_pair_acq: measured flux =", meas_flux)
+        print("flat_pair_acq: measured flux =", meas_flux)
+#        self.logger.info("flat_pair_acq: measured flux =", meas_flux)
 
         # Loop over exposure pairs.
         for seqno, tokens in enumerate(self.instructions):
+
+            time.sleep(5.0)
+
             self.image_clears()
             self.bias_image(seqno)
 
             slit_width_changed = self._set_slitwidth(tokens, 2)
             if slit_width_changed:
                 meas_flux = self.measured_flux(self.wl)
-                self.logger.info("flat_pair_acq: measured flux =", meas_flux)
+                print("flat_pair_acq: measured flux =", meas_flux)
+#                self.logger.info("flat_pair_acq: measured flux =", meas_flux)
 
             # Compute exposure time in ms to obtain the desired signal level.
             target_counts = float(tokens[1])  # e-/pixel

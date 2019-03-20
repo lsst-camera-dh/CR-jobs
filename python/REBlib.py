@@ -24,46 +24,6 @@ wreb     = subsystem + "/WREB"        #
 wbiases  = subsystem + "/WREB.Bias0"  # 
 wrails   = subsystem + "/WREB.DAC"    # 
  
-# scaling parameters for the clock voltages
-pHi_gain = 0.96
-pHi_offset = 0.00
-pLo_gain = 0.96
-pLo_offset = 0.00
-sHi_gain = 0.96
-sHi_offset = 0.00
-sLo_gain = 0.96
-sLo_offset = 0.00
-rgHi_gain = 0.96
-rgHi_offset = 0.00
-rgLo_gain = 0.96
-rgLo_offset = 0.00
-
-wOD_gain = 1.00
-wOD_offset = 0.00
-wRD_gain = 1.00
-wRD_offset = 0.00
-wOG_gain = 1.00
-wOG_offset = 0.00
-wGD_gain = 1.00
-wGD_offset = 0.00
-
-g0OD_gain = 1.00
-g0OD_offset = 0.00
-g0RD_gain = 1.00
-g0RD_offset = 0.00
-g0OG_gain = 1.00
-g0OG_offset = 0.00
-g0GD_gain = 1.00
-g0GD_offset = 0.00
-
-g1OD_gain = 1.00 
-g1OD_offset = 0.00
-g1RD_gain = 1.00
-g1RD_offset = 0.00
-g1OG_gain = 1.00
-g1OG_offset = 0.00
-g1GD_gain = 1.00
-g1GD_offset = 0.00
 
 # ------ Function Definitions -------- #
 
@@ -201,135 +161,6 @@ def loadAspics(reb):
     board = getRaftSubsystem(reb)
     board.sendSynchCommand("loadAspics true")   
     
-def loadDACS(reb):
-    #if verbose: print "Loading DACs on " + reb
-    board = getRaftSubsystem(reb)
-    board.sendSynchCommand("loadDacs true")    
-    board.sendSynchCommand("loadBiasDacs true")    
-    # result = board.sendSynchCommand("loadAspics true")   
-    #time.sleep(1)
-
-def zeroVolts(reb):  # zeros values in memory, does not load DACs
-    biases = getRaftBiases(reb)
-    biases.sendSynchCommand("change odP 0.01" )
-    biases.sendSynchCommand("change rdP 0" )
-    biases.sendSynchCommand("change gdP 0" )
-    biases.sendSynchCommand("change ogP 0" )
-    rails = getRaftRails(reb)
-    rails.sendSynchCommand("change pclkLowP 0")
-    rails.sendSynchCommand("change pclkHighP 0")
-    rails.sendSynchCommand("change sclkLowP 0")
-    rails.sendSynchCommand("change sclkHighP 0")
-    rails.sendSynchCommand("change rgLowP 0")
-    rails.sendSynchCommand("change rgHighP 0")
-
-def vsetOD(reb, volts):
-    if verbose: print "Setting ", reb, " OD: ", volts
-    biases = getRaftBiases(reb)
-    if reb in ['wreb','w']:
-        volts = volts * wOD_gain + wOD_offset
-    elif reb in ['greb','greb0','g0','g']:
-        volts = volts * g0OD_gain + g0OD_offset
-    elif reb in ['greb1','g1']:
-        volts = volts * g1OD_gain + g1OD_offset
-    else:
-        print 'REB type ',reb,' not recognized'
-    biases.sendSynchCommand("change odP %f" % volts)
-    loadDACS(reb)   
-
-def vrampOD(reb, start, stop, step):
-    if verbose: print "Ramping ", reb, " OD: ", start, stop, step
-    volts = start 
-    if stop > start:
-        while volts < stop:
-            vsetOD(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start:
-        while volts > stop:
-            vsetOD(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetOD(reb, stop)
-
-def vsetRD(reb, volts):
-    if verbose: print "Setting ", reb, " RD: ", volts
-    biases = getRaftBiases(reb)
-    if reb in ['wreb','w']:
-        volts = volts * wRD_gain + wRD_offset
-    elif reb in ['greb','greb0','g0','g']:
-        volts = volts * g0RD_gain + g0RD_offset
-    elif reb in ['greb1','g1']:
-        volts = volts * g1RD_gain + g1RD_offset
-    else:
-        print 'REB type ',reb,' not recognized'
-    biases.sendSynchCommand("change rdP %f" % volts)
-    loadDACS(reb)   
-
-def vrampRD(reb, start, stop, step):
-    if verbose: print "Ramping ", reb, " RD: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetRD(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetRD(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetRD(reb, stop)
-
-def vsetOG(reb, volts):
-    if verbose: print "Setting ", reb, " OG: ", volts
-    biases = getRaftBiases(reb)
-    if reb in ['wreb','w']:
-        volts = volts * wOG_gain + wOG_offset
-    elif reb in ['greb','greb0','g0','g']:
-        volts = volts * g0OG_gain + g0OG_offset
-    elif reb in ['greb1','g1']:
-        volts = volts * g1OG_gain + g1OG_offset
-    else:
-        print 'REB type ',reb,' not recognized'
-    biases.sendSynchCommand("change ogP %f" % volts)
-    loadDACS(reb)   
-
-def vrampOG(reb, start,stop,step):
-    if verbose: print "Ramping ", reb, " OG: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetOG(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetOG(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetOG(reb, stop)
-
-def vsetGD(reb, volts):
-    if verbose: print "Setting ", reb, " GD: ", volts
-    biases = getRaftBiases(reb)
-    if reb in ['wreb','w']:
-        volts = volts * wGD_gain + wGD_offset
-    elif reb in ['greb','greb0','g0','g']:
-        volts = volts * g0GD_gain + g0GD_offset
-    elif reb in ['greb1','g1']:
-        volts = volts * g1GD_gain + g1GD_offset
-    else:
-        print 'REB type ',reb,' not recognized'
-    biases.sendSynchCommand("change gdP %f" % volts)
-    loadDACS(reb)   
-
-def vrampGD(reb, start,stop,step):
-    if verbose: print "Ramping ", reb, " GD: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetGD(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetGD(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetGD(reb, stop)
 
 def vsetParLo(reb, volts):
     if verbose: print "Setting ", reb, " Parallel low: ", volts
@@ -371,175 +202,6 @@ def vrampParHi(reb, start, stop, step):
             volts = max(volts - abs(step), stop)
     vsetParHi(reb, stop)
 
-def vsetSerLo(reb, volts):
-    if verbose: print "Setting ", reb, " Serial low: ", volts
-    rails = getRaftRails(reb)
-    volts = volts * sLo_gain + sLo_offset
-    rails.sendSynchCommand("change sclkLowP %f" % volts)
-    loadDACS(reb)
-
-def vrampSerLo(reb, start,stop,step):
-    if verbose: print "Ramping ", reb, " Serial Low: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetSerLo(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetSerLo(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetSerLo(reb, stop)
- 
-def vsetSerHi(reb, volts):
-    if verbose: print "Setting ", reb, " Serial high: ", volts
-    rails = getRaftRails(reb)
-    volts = volts * sHi_gain + sHi_offset
-    rails.sendSynchCommand("change sclkHighP %f" % volts)
-    loadDACS(reb)
-
-def vrampSerHi(reb, start, stop, step):
-    if verbose: print "Ramping ", reb, " Serial High: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetSerHi(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetSerHi(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetSerHi(reb, stop)
- 
-def vsetRGLo(reb, volts):
-    if verbose: print "Setting ", reb, " RG low: ", volts
-    rails = getRaftRails(reb)
-    volts = volts * rgLo_gain + rgLo_offset
-    rails.sendSynchCommand("change rgLowP %f" % volts)
-    loadDACS(reb)
-
-def vrampRGLo(reb, start, stop, step):
-    if verbose: print "Ramping ", reb, " RG Low: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetRGLo(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetRGLo(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetRGLo(reb, stop)
-
-def vsetRGHi(reb, volts):
-    if verbose: print "Setting ", reb, " RG high: ", volts
-    rails = getRaftRails(reb)
-    volts = volts * rgHi_gain + rgHi_offset
-    rails.sendSynchCommand("change rgHighP %f" % volts)
-    loadDACS(reb)
-
-def vrampRGHi(reb, start,stop,step):
-    if verbose: print "Ramping ", reb, " RG high: ", start, stop, step
-    volts = start 
-    if stop > start :
-        while volts < stop:
-            vsetRGHi(reb, volts)
-            volts = min(volts + abs(step), stop)
-    elif stop < start :
-        while volts > stop:
-            vsetRGHi(reb, volts)
-            volts = max(volts - abs(step), stop)
-    vsetRGHi(reb, stop)
-
-def ccdPowerUp(reb, ccd):
-    if ccd.upper() in ['e2v','E2V']: 
-        vsetRD(reb,18.0)
-        vsetOD(reb,30.0)
-        vsetGD(reb,26.0)
-        vsetOG(reb,4.0)
-        vsetSerLo(reb,0.50)
-        vsetSerHi(reb,+9.5)
-        vsetParLo(reb,0.0)
-        vsetParHi(reb,+9.0)
-        vsetRGLo(reb,0.0)
-        vsetRGHi(reb,+11.5)
-        vsetDphi(reb,+8.0)
-        dphiOn(reb)
-    elif ccd.upper() in ['ITL','ITLA','ITL_A']:
-        vrampSerLo(reb,0,-5.0, 2.0)
-        vrampSerHi(reb,0,+5.0, 2.0)
-        vrampParLo(reb,0,-8.0, 2.0)
-        vrampParHi(reb,0,+3.0, 1.0)
-        dphiOn(reb)
-        vrampDphi(reb,7,+10.0, 1.0)
-        vrampRGLo(reb,0,-2.0, 1.0)
-        vrampRGHi(reb,0,+8.0, 2.0)
-        vrampOG(reb,0,-2.0, 1.0)
-        vrampGD(reb,0,20.0, 4.0)
-        vrampRD(reb,0,13.0, 3.0)
-        vrampOD(reb,0,25.0, 4.0)
-    elif ccd.upper() in ['ITLB','ITL_B']:
-        vsetSerLo(reb,-8.0)
-        vsetSerHi(reb,+4.0)
-        vsetParLo(reb,-8.0)
-        vsetParHi(reb,+3.0)
-        vsetRGLo(reb,-2.0)
-        vsetRGHi(reb,+8.0)
-        vsetOG(reb,+3.0)
-        vsetGD(reb,20.0)
-        vsetRD(reb,13.0)
-        vsetOD(reb,25.0)
-        vsetDphi(reb,+10.0)
-        dphiOn(reb)
-    else:
-        print 'CCD type ',ccd,' not recognized'
-    print 'Device type: ',ccd,' powered on.'   
-
-def ccdPowerDown(reb, ccd):
-    setBackBiasOff(reb)
-    if ccd.upper() in ['E2V']: 
-        vsetRGHi(reb,0.0)
-        vsetRGLo(reb,0.0)
-        vsetParHi(reb,0.0)
-        vsetDphi(reb,7.0)
-        dphiOff(reb)
-        vsetParLo(reb,0.0)
-        vsetSerHi(reb,0.0)
-        vsetSerLo(reb,0.0)
-        vsetOG(reb,0.0)
-        vsetGD(reb,0.0)
-        vsetOD(reb,0.0)
-        vsetRD(reb,0.0)
-    elif ccd.upper() in ['ITL','ITLA','ITLB','ITL_A','ITL_B']:
-        vsetOD(reb,0.0)
-        vsetRD(reb,0.0)
-        vsetGD(reb,0.0)
-        vsetOG(reb,0.0)
-        vsetRGHi(reb,0.0)
-        vsetRGLo(reb,0.0)
-        vsetParHi(reb,0.0)
-        vsetDphi(reb,7.0)
-        dphiOff(reb)
-        vsetParLo(reb,0.0)
-        vsetSerHi(reb,0.0)
-        vsetSerLo(reb,0.0)
-    else:
-        print 'CCD type ',ccd,' not recognized'
-    print 'Device type: ',ccd,' powered off.'   
-
-
-def ITLdefaults(reb):
-    if verbose: print "Setting default ITL voltages"
-    vsetParLo(reb,-8.0)
-    vsetParHi(reb,+3.0)
-    vsetSerLo(reb,-5.0)
-    vsetSerHi(reb,+5.0)
-    vsetRGLo(reb,-2.0)
-    vsetRGHi(reb,+8.0)
-    vsetRD(reb,13.0)
-    vsetOG(reb,-2.0)
-    vsetOD(reb,25.0)
-    vsetGD(reb,20.0)
 
 def setSeqStart(reb,main):
     subsys=getRaftSubsystem(reb)
@@ -654,7 +316,7 @@ def acquireDark(exptime, filebase):
     return acquire(exptime)
 
 # added to match standard harnessed job scripts for EO acquisitions
-def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
+def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase, doppump = False ):
     setDataDir(cwd)
     print("dataDir_ = ",dataDir_)
 
@@ -681,7 +343,7 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
 #        print "%s=%d" % (pntr.getKey(),pntr.getValue().value)
 
     flushpntr = None
-    if dolight :
+    if dolight or doXED :
         flushpntr = int(subs["ExposureFlush"])
         print "setting exposure to ExposureFlush with index ",flushpntr
     else :
@@ -693,7 +355,7 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
     if exptime == 0.0 :
         files = acquireBias(filebase)
     else :
-        files = acquireExposure(exptime/1000., filebase)
+        files = acquireExposure(exptime/1000., filebase, doppump)
 #    elif not dolight and not doXED :
 #        files = acquireDark(exptime/1000., filebase)
 #    elif not dolight and doXED :
@@ -713,7 +375,7 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase):
     return files
 
 
-def acquireExposure(exptime, filebase):
+def acquireExposure(exptime, filebase, doppump=False):
     if verbose: print "Acquire Exposure:  Time = ", exptime, "   Filebase = ",filebase
     raftsub = CCS.attachSubsystem(subsystem)
 
@@ -725,7 +387,11 @@ def acquireExposure(exptime, filebase):
     try:
 #        result = raftsub.sendSynchCommand("setSequencerStart Exposure")
         print("set sequencer start to Expose")
-        result = raftsub.sendSynchCommand("setSequencerStart Expose")
+        if not doppump :
+            result = raftsub.sendSynchCommand("setSequencerStart Expose")
+        else :
+            result = raftsub.sendSynchCommand("setSequencerStart PocketPump")
+
     except:
         print("Failed to set sequencer start to Exposure!!! Proceeding during development period")
 

@@ -190,6 +190,9 @@ class EOAcquisition(object):
         self.sub.ts8.sendSynchCommand(command)
         command = "setPrimaryHeaderKeyword RunNumber %s" % self.md.run_number
         self.sub.ts8.sendSynchCommand(command)
+        print("temp = ",self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0"))
+        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword","CRSACCDTemp",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
+        print("setting CCDTEMP using ","setPrimaryHeaderKeyword","CRSACCDTemp",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
 
     def _get_exptime_limits(self):
         """
@@ -734,7 +737,7 @@ class PhotodiodeReadout(object):
                          time.time() - self._start_time)
             time.sleep(0.25)
 
-    def write_readings(self, seqno, icount=1):
+    def write_readings(self, fits_files, seqno, icount=1):
         """
         Output the accumulated photodiode readings to a text file.
         """
@@ -750,6 +753,12 @@ class PhotodiodeReadout(object):
         print("pd_filename = ",pd_filename)
         self.logger.info("Photodiode readout accumulation finished at %f, %s",
                          time.time() - self._start_time, result)
+
+        for fits_file in fits_files:
+            full_path = glob.glob('%s/*/%s' % (self.md.cwd, fits_file))[0]
+            noextpath = full_path.split('.')[0]
+            co_pd_file = noextpath + "_pdvals.txt"
+            os.popen('cp -p %s %s' % (pd_filename,co_pd_file))
 
         return pd_filename
 
@@ -768,7 +777,7 @@ class PhotodiodeReadout(object):
         write that time history to the FITS files as a binary table
         extension.
         """
-        pd_filename = self.write_readings(seqno, icount)
+        pd_filename = self.write_readings(fits_files,seqno, icount)
 #        try:
 #            self.add_pd_time_history(fits_files, pd_filename)
 #        except TypeError:

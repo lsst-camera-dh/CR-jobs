@@ -3,6 +3,7 @@ Jython script to acquire dark exposure dataset (used to find bright defects and
 to estimate dark current).
 """
 from eo_acquisition import EOAcquisition, AcqMetadata, logger
+from ccs_scripting_tools import CcsSubsystems, CCS
 
 class DarkAcquisition(EOAcquisition):
     """
@@ -24,6 +25,9 @@ class DarkAcquisition(EOAcquisition):
         openShutter = False
         actuateXed = False
         image_type = "DARK"
+
+#        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
+#        pdusub.sendSynchCommand("forceOutletOff XED-CONTROL")
 
         print("chk1")
         for tokens in self.instructions:

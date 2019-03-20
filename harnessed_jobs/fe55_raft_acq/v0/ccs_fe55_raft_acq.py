@@ -2,6 +2,8 @@
 Jython script to run Fe55 acquisitions at TS8.
 """
 from eo_acquisition import EOAcquisition, AcqMetadata, logger
+from ccs_scripting_tools import CcsSubsystems, CCS
+import time
 
 class Fe55Acquisition(EOAcquisition):
     """
@@ -21,8 +23,12 @@ class Fe55Acquisition(EOAcquisition):
         actuateXed = True
         image_type = "FE55"
 
-        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
-        pdusub.sendSynchCommand("PDU20 forceOutletOn XED-CONTROL")
+#        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
+#        pdusub.sendSynchCommand("forceOutletOn XED-CONTROL")
+#        time.sleep(10.0)
+
+        self.sub.mono.sendSynchCommand("closeShutter")
+
 
         seqno = 0
         for tokens in self.instructions:
@@ -35,8 +41,9 @@ class Fe55Acquisition(EOAcquisition):
                                 image_type)
                 seqno += 1
 
-        pdusub = CCS.attachSubsystem("ts7-2cr/PDU20")
-        pdusub.sendSynchCommand("PDU20 forceOutletOff XED-CONTROL")
+#        pdusub.sendSynchCommand("forceOutletOff XED-CONTROL")
+        self.sub.mono.sendSynchCommand("openShutter")
+
 
 if __name__ == '__main__':
     metadata = AcqMetadata(cwd=tsCWD, raft_id=UNITID, run_number=RUNNUM)
