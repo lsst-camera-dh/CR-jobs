@@ -41,7 +41,8 @@ class SuperFlatAcquisition(EOAcquisition):
             for iframe in range(nframes):
                 self.image_clears()
                 self.bias_image(seqno)
-                file_template = '${CCDSerialLSST}_${testType}_${imageType}_%s%3.3d_${timestamp}.fits' % (flux_level, seqno+1)
+#                file_template = '${CCDSerialLSST}_${testType}_${imageType}_%s%3.3d_${timestamp}.fits' % (flux_level, seqno+1)
+                file_template = '${rebName}${sensorId}_${testType}_${imageType}_%s%3.3d_${timestamp}.fits' % (flux_level, seqno+1)
                 pd_readout.start_accumulation()
                 fits_files = self.take_image(seqno, exptime, openShutter,
                                              actuateXed, image_type,

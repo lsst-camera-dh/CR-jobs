@@ -54,7 +54,8 @@ class FlatAcquisition(EOAcquisition):
             # Take a pair of exposures (self.imcount = 2).
             for icount in range(self.imcount):
                 self.image_clears()
-                file_template = '${CCDSerialLSST}_${testType}_%07.2fs_${imageType}%d_${RunNumber}_${timestamp}.fits' % (exptime, icount+1)
+#                file_template = '${CCDSerialLSST}_${testType}_%07.2fs_${imageType}%d_${RunNumber}_${timestamp}.fits' % (exptime, icount+1)
+                file_template = '${rebName}${sensorId}_${testType}_%07.2fs_${imageType}%d_${RunNumber}_${timestamp}.fits' % (exptime, icount+1)
                 pd_readout.start_accumulation()
                 fits_files = self.take_image(seqno, exptime, openShutter,
                                              actuateXed, image_type,

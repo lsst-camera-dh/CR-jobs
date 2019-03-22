@@ -352,6 +352,8 @@ def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase, doppump = Fals
     pntrs = raftsub.sendSynchCommand("setSequencerParameter %s %s" % ("Exposure",str(flushpntr)))
 # -------
 
+    setFilename(filebase)
+
     if exptime == 0.0 :
         files = acquireBias(filebase)
     else :
@@ -379,7 +381,7 @@ def acquireExposure(exptime, filebase, doppump=False):
     if verbose: print "Acquire Exposure:  Time = ", exptime, "   Filebase = ",filebase
     raftsub = CCS.attachSubsystem(subsystem)
 
-    raftsub.sendSynchCommand("setExposureTime %i" % long(exptime))
+    raftsub.sendSynchCommand("setExposureTime %f" % exptime)
     print("setSequencerParameter ExposureTime %i" % long(exptime * 1000 / 25))
     raftsub.sendSynchCommand("setSequencerParameter ExposureTime %i" % long(exptime * 1000 / 25))
 #    setFilename(filebase)

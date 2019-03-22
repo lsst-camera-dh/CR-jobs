@@ -334,6 +334,7 @@ class EOAcquisition(object):
             file_template = self._fn_pattern
         self.logger.info("%s: taking image type %s %d", test_type, image_type,
                          seqno)
+        self.logger.info("file_template = %s , fn_pattern = %s", file_template, self._fn_pattern)
         self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword TestType %s" % test_type)
         self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword ImageType %s" % image_type)
         self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword SeqInfo %s" % seqno)
