@@ -110,7 +110,7 @@ def setFilebase(filebase):
     raftsub = CCS.attachSubsystem(subsystem)
 #    fname = filebase + "_${timestamp}.fits"
     fname = filebase
-    raftsub.sendSynchCommand("setFitsFileNamePattern " + fname)
+    raftsub.sendSynchCommand("setFitsFileNamePattern",fname)
 
 def setFilename(filebase):
     raftsub = CCS.attachSubsystem(subsystem)
@@ -118,7 +118,7 @@ def setFilename(filebase):
     fname = filebase
     # for a single sensor from one REB: fname = prefix + filebase + "_${timestamp}.fits" #for WREB
     print "Filename : ",fname
-    raftsub.sendSynchCommand("setFitsFileNamePattern " + fname)
+    raftsub.sendSynchCommand("setFitsFileNamePattern",fname)
 #    raftsub.sendSynchCommand("setFitsFileNamePattern blah.fits")
 
 #def crtmInit():
@@ -288,6 +288,7 @@ def acquire(exptime):
 
     dataDir_ = getDataDir()
     if verbose: print "Saving FITS image to ", dataDir_
+
     result = raftsub.sendSynchCommand(Duration.ofSeconds(120),"saveFitsImage",dataDir_)
     if verbose: print result
     return result
@@ -317,7 +318,7 @@ def acquireDark(exptime, filebase):
 
 # added to match standard harnessed job scripts for EO acquisitions
 def acquireExposureMaster(exptime, dolight, doXED, cwd, filebase, doppump = False ):
-    setDataDir(cwd)
+    setDataDir(cwd+"/")
     print("dataDir_ = ",dataDir_)
 
     raftsub = CCS.attachSubsystem(subsystem)

@@ -330,8 +330,12 @@ class EOAcquisition(object):
         """
         if test_type is None:
             test_type = self.test_type
-        if file_template is None:
+        if file_template is None :
             file_template = self._fn_pattern
+        elif len(file_template) is 0 : 
+            file_template = self._fn_pattern
+        print("len(file_template) = ",len(file_template))
+
         self.logger.info("%s: taking image type %s %d", test_type, image_type,
                          seqno)
         self.logger.info("file_template = %s , fn_pattern = %s", file_template, self._fn_pattern)
