@@ -761,7 +761,7 @@ class PhotodiodeReadout(object):
 
         for fits_file in fits_files:
             full_path = glob.glob('%s/*/%s' % (self.md.cwd, fits_file))[0]
-            noextpath = full_path.split('.')[0]
+            noextpath = full_path.split('.fits')[0]
             co_pd_file = noextpath + "_pdvals.txt"
             os.popen('cp -p %s %s' % (pd_filename,co_pd_file))
 
