@@ -191,8 +191,10 @@ class EOAcquisition(object):
         command = "setPrimaryHeaderKeyword RunNumber %s" % self.md.run_number
         self.sub.ts8.sendSynchCommand(command)
         print("temp = ",self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0"))
-        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword","CRSACCDTemp",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
-        print("setting CCDTEMP using ","setPrimaryHeaderKeyword","CRSACCDTemp",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
+#        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword","CRSACCDTemp",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
+#        print("setting CCDTEMP using ","setPrimaryHeaderKeyword","CRSACCDTemp",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
+        self.sub.ts8.sendSynchCommand("setPrimaryHeaderKeyword","MeasuredTemperature",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
+        print("setting CCDTEMP using ","setPrimaryHeaderKeyword","MeasuredTemperature",float(self.sub.ts8.sendSynchCommand("getChannelValue WREB.CCDtemp0")))
 
     def _get_exptime_limits(self):
         """
