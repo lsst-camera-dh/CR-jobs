@@ -27,7 +27,7 @@ class Fe55Acquisition(EOAcquisition):
 #        pdusub.sendSynchCommand("forceOutletOn XED-CONTROL")
 #        time.sleep(10.0)
 
-        self.sub.mono.sendSynchCommand("closeShutter")
+#        self.sub.mono.sendSynchCommand("closeShutter")
 
 
         seqno = 0
